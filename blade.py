@@ -16,7 +16,7 @@ class Runner:
                 '{} is not an executable!'.format(executable))
             sys.exit(1)
 
-        self.executable = executable
+        self.executable = os.path.abspath(executable)
         self.path_dictionary = {}
 
         for path in args:
