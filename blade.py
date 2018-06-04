@@ -1,27 +1,29 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import os, sys, time, shutil, tarfile, argparse, subprocess
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 #*******************************************************************************
 
 class Runner:
 
-    __work_directory = os.path.dirname(os.path.realpath(__file__)) +\
-        '/replicant_list'
-
-    def __init__(self, executable, *args):
+    def __init__(self, executable, reference_required, *args):
 
         if (not (os.path.isfile(executable) and os.access(executable, os.X_OK))):
-            print('blade::Runner:: error: '
+            eprint('Blade::Runner::__init__ error: '
                 '{} is not an executable!'.format(executable))
             sys.exit(1)
 
         self.executable = os.path.abspath(executable)
+        self.reference_required = reference_required
         self.path_dictionary = {}
 
         for path in args:
             if (not os.path.isdir(path)):
-                print('blade::Runner:: warning: '
+                eprint('Blade::Runner::__init__ warning: '
                     '{} is not a directory!'.format(path))
                 continue
 
@@ -39,35 +41,41 @@ class Runner:
                     elif (data_name.endswith(('.tar.gz', '.tgz'))):
                         self.path_dictionary[directory_path][2].add(data_path)
 
-    def reload(self, executable, *args):
-        __init__(executetable, *args)
+        self.work_directory = os.getcwd() + '/replicant_list'
+
+    def __enter__(self):
+        try:
+            os.makedirs(self.work_directory)
+        except OSError:
+            if (not os.path.isdir(self.work_directory)):
+                eprint('Blade::Runner::__enter__ error: unable to create work directory!')
+                sys.exit(1)
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        pass
 
     def execute(self):
 
-        try:
-            os.makedirs(Runner.__work_directory)
-        except OSError:
-            if (not os.path.isdir(Runner.__work_directory)):
-                print('blade::Runner::execute error: '
-                    'unable to create work directory!')
-                sys.exit(1)
-
-        runner_report = open(os.path.join(Runner.__work_directory,\
-            'blade_runner_report_' + str(time.time()) + '.txt'), "w")
+        runner_report = open(os.path.join(self.work_directory,\
+            'blade_runner_report_' + str(time.time()) + '.txt'), 'w')
 
         for directory_path, data_paths in self.path_dictionary.items():
             if (sum([len(paths) for paths in data_paths]) == 0):
                 continue
-            print('Processing directory {}'.format(directory_path))
 
             reference_paths, uncompressed_data_paths, compressed_data_paths = data_paths
 
             reference_path = next(iter(reference_paths))\
-                if (len(reference_paths) != 0) else ""
+                if (len(reference_paths) != 0) else ''
+
+            if self.reference_required and not reference_path:
+                continue
+
+            eprint('Blade::Runner::execute processing directory {}'.format(directory_path))
 
             for data_path in uncompressed_data_paths:
 
-                print('--> {} {} {}'.format(\
+                eprint('--> {} {} {}'.format(\
                     os.path.basename(self.executable),\
                     os.path.basename(data_path),\
                     os.path.basename(reference_path)))
@@ -77,7 +85,7 @@ class Runner:
                 p.communicate()
 
             for compressed_data_path in compressed_data_paths:
-                print('--[ extracting {}'.format(\
+                eprint('--[ extracting {}'.format(\
                     os.path.basename(compressed_data_path)))
 
                 shutil.copy(compressed_data_path, Runner.__work_directory)
@@ -95,7 +103,7 @@ class Runner:
 
                 for data_path in data_paths:
 
-                    print('    --> {} {} {}'.format(\
+                    eprint('    --> {} {} {}'.format(\
                         os.path.basename(self.executable),\
                         os.path.basename(data_path),\
                         os.path.basename(reference_path)))
@@ -110,7 +118,7 @@ class Runner:
 
 #*******************************************************************************
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='''Run any executable which has
         the form \'executable reads [reference]\' on a large amount of
@@ -123,7 +131,12 @@ if __name__ == "__main__":
         compressed (.tar.gz or .tgz) or uncompressed sequencing data in FASTA or
         FASTQ format (supported file extensions are .fa, .fasta, .fq and
         .fastq)''')
+    parser.add_argument('-r', '--reference-required', action='store_true',
+        help='''ignore datasets without a reference genome''')
+
     args = parser.parse_args()
 
-    runner = Runner(args.executable, *args.path)
-    runner.execute()
+    runner = Runner(args.executable, args.reference_required, *args.path)
+
+    with runner:
+        runner.execute()
