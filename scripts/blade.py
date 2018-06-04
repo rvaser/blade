@@ -88,16 +88,16 @@ class Runner:
                 eprint('--[ extracting {}'.format(\
                     os.path.basename(compressed_data_path)))
 
-                shutil.copy(compressed_data_path, Runner.__work_directory)
+                shutil.copy(compressed_data_path, self.work_directory)
 
-                tar_path = os.path.join(Runner.__work_directory,\
+                tar_path = os.path.join(self.work_directory,\
                     os.path.basename(compressed_data_path))
                 tar = tarfile.open(tar_path)
 
-                data_paths = [os.path.join(Runner.__work_directory, data_path)\
+                data_paths = [os.path.join(self.work_directory, data_path)\
                     for data_path in tar.getnames()]
 
-                tar.extractall(Runner.__work_directory)
+                tar.extractall(self.work_directory)
                 tar.close()
                 os.remove(tar_path)
 
